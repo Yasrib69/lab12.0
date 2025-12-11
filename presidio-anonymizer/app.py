@@ -42,7 +42,6 @@ class Server:
 
         @self.app.route("/health")
         def health() -> str:
-            """Return basic health probe result."""
             return "Presidio Anonymizer service is up"
 
         @self.app.route("/anonymize", methods=["POST"])
@@ -60,12 +59,12 @@ class Server:
             analyzer_results = AppEntitiesConvertor.analyzer_results_from_json(
                 content.get("analyzer_results")
             )
-            anoymizer_result = self.anonymizer.anonymize(
+            anonymizer_result = self.anonymizer.anonymize(
                 text=content.get("text", ""),
                 analyzer_results=analyzer_results,
                 operators=anonymizers_config,
             )
-            return Response(anoymizer_result.to_json(), mimetype="application/json")
+            return Response(anonymizer_result.to_json(), mimetype="application/json")
 
         @self.app.route("/deanonymize", methods=["POST"])
         def deanonymize() -> Response:
@@ -88,13 +87,65 @@ class Server:
 
         @self.app.route("/anonymizers", methods=["GET"])
         def anonymizers():
-            """Return a list of supported anonymizers."""
             return jsonify(self.anonymizer.get_anonymizers())
 
         @self.app.route("/deanonymizers", methods=["GET"])
         def deanonymizers():
-            """Return a list of supported deanonymizers."""
             return jsonify(self.deanonymize.get_deanonymizers())
+
+        @self.app.route("/genz-preview", methods=["GET"])
+        def genz_preview():
+            """
+            Returns example Gen-Z anonymization output.
+            """
+            response_body = {
+                "example": "Call Emily at 577-988-1234",
+                "example_output": "Call GOAT at vibe check",
+                "description": "Example output of the genz anonymizer."
+            }
+            return jsonify(response_body), 200
+
+        @self.app.route("/genz", methods=["POST"])
+        def genz_anonymize():
+            """
+            Apply a simple Gen-Z anonymizer to PERSON and PHONE_NUMBER entities.
+            """
+            data = request.get_json(force=True) or {}
+
+            text = data.get("text", "")
+            analyzer_results = data.get("analyzer_results", [])
+
+            items = []
+
+            for result in analyzer_results:
+                entity_type = result.get("entity_type")
+                start = result.get("start")
+                end = result.get("end")
+
+                # Simple mapping for lab requirements
+                if entity_type == "PERSON":
+                    replacement_text = "GOAT"
+                elif entity_type == "PHONE_NUMBER":
+                    replacement_text = "oop-"
+                else:
+                    replacement_text = "vibe"
+
+                items.append(
+                    {
+                        "start": start,
+                        "end": end,
+                        "entity_type": entity_type,
+                        "text": replacement_text,
+                        "operator": "genz",
+                    }
+                )
+
+            response_body = {
+                "text": text,
+                "items": items,
+            }
+
+            return jsonify(response_body), 200
 
         @self.app.errorhandler(InvalidParamError)
         def invalid_param(err):
@@ -112,9 +163,11 @@ class Server:
             self.logger.error(f"A fatal error occurred during execution: {e}")
             return jsonify(error="Internal server error"), 500
 
-def create_app(): # noqa
+
+def create_app():  # noqa
     server = Server()
     return server.app
+
 
 if __name__ == "__main__":
     app = create_app()
