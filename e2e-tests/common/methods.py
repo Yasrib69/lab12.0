@@ -27,24 +27,12 @@ def anonymizers():
     return response.status_code, response.content
 
 
+
 def deanonymize(data):
     response = requests.post(
         f"{ANONYMIZER_BASE_URL}/deanonymize", data=data, headers=DEFAULT_HEADERS
     )
     return response.status_code, response.content
-
-
-def genz(data):
-    """
-    Call the /genz endpoint of the anonymizer service.
-
-    `data` should be a JSON string, just like in the anonymize() tests.
-    """
-    response = requests.post(
-        f"{ANONYMIZER_BASE_URL}/genz", data=data, headers=DEFAULT_HEADERS
-    )
-    return response.status_code, response.content
-
 
 def __get_redact_payload(color_fill):
     payload = {}

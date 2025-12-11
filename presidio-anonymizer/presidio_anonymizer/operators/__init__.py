@@ -16,7 +16,6 @@ from .replace import Replace
 
 try:
     from .ahds_surrogate import AHDSSurrogate
-
     AHDS_AVAILABLE = True
 except ImportError:
     AHDSSurrogate = None

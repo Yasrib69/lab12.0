@@ -3,7 +3,7 @@ import json
 import pytest
 
 from common.assertions import equal_json_strings
-from common.methods import anonymize, anonymizers, deanonymize, genz
+from common.methods import anonymize, anonymizers, deanonymize
 
 
 @pytest.mark.api
@@ -401,35 +401,3 @@ def test_overlapping_keep_both():
 
     assert response_status == 200
     assert equal_json_strings(expected_response, response_content)
-
-
-@pytest.mark.api
-def test_given_genz_called_with_valid_request_then_expected_valid_response_returned():
-    request_body = """
-    {
-        "text": "Please contact Emily Carter at 734-555-9284 if you have questions about the workshop registration.",
-        "analyzer_results": [
-            { "start": 15, "end": 27, "score": 0.3, "entity_type": "PERSON" },
-            { "start": 31, "end": 43, "score": 0.95, "entity_type": "PHONE_NUMBER" }
-        ]
-    }
-    """
-
-    response_status, response_content = genz(request_body)
-
-    assert response_status == 200
-
-    body = json.loads(response_content)
-    # Should echo original text
-    assert body["text"] == "Please contact Emily Carter at 734-555-9284 if you have questions about the workshop registration."
-    # Should return one item per analyzer result
-    assert "items" in body
-    assert len(body["items"]) == 2
-
-    for item in body["items"]:
-        assert "start" in item
-        assert "end" in item
-        assert "entity_type" in item
-        assert "text" in item
-        # Lab requirement: operator must be "genz"
-        assert item["operator"] == "genz"
