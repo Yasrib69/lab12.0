@@ -12,7 +12,6 @@ from presidio_anonymizer.services.app_entities_convertor import AppEntitiesConve
 from werkzeug.exceptions import BadRequest, HTTPException
 
 DEFAULT_PORT = "3000"
-
 LOGGING_CONF_FILE = "logging.ini"
 
 WELCOME_MESSAGE = r"""
@@ -40,11 +39,17 @@ class Server:
         self.deanonymize = DeanonymizeEngine()
         self.logger.info(WELCOME_MESSAGE)
 
+        # ----------------------------------------------------------------------
+        # Health Route
+        # ----------------------------------------------------------------------
         @self.app.route("/health")
         def health() -> str:
             """Return basic health probe result."""
             return "Presidio Anonymizer service is up"
 
+        # ----------------------------------------------------------------------
+        # Standard Anonymize Endpoint
+        # ----------------------------------------------------------------------
         @self.app.route("/anonymize", methods=["POST"])
         def anonymize() -> Response:
             content = request.get_json()
@@ -60,18 +65,22 @@ class Server:
             analyzer_results = AppEntitiesConvertor.analyzer_results_from_json(
                 content.get("analyzer_results")
             )
-            anoymizer_result = self.anonymizer.anonymize(
+            anonymizer_result = self.anonymizer.anonymize(
                 text=content.get("text", ""),
                 analyzer_results=analyzer_results,
                 operators=anonymizers_config,
             )
-            return Response(anoymizer_result.to_json(), mimetype="application/json")
+            return Response(anonymizer_result.to_json(), mimetype="application/json")
 
+        # ----------------------------------------------------------------------
+        # Standard Deanonymize Endpoint
+        # ----------------------------------------------------------------------
         @self.app.route("/deanonymize", methods=["POST"])
         def deanonymize() -> Response:
             content = request.get_json()
             if not content:
                 raise BadRequest("Invalid request json")
+
             text = content.get("text", "")
             deanonymize_entities = AppEntitiesConvertor.deanonymize_entities_from_json(
                 content
@@ -86,6 +95,9 @@ class Server:
                 deanonymized_response.to_json(), mimetype="application/json"
             )
 
+        # ----------------------------------------------------------------------
+        # Supported anonymizer/deanonymizer listing endpoints
+        # ----------------------------------------------------------------------
         @self.app.route("/anonymizers", methods=["GET"])
         def anonymizers():
             """Return a list of supported anonymizers."""
@@ -96,6 +108,61 @@ class Server:
             """Return a list of supported deanonymizers."""
             return jsonify(self.deanonymize.get_deanonymizers())
 
+        # ----------------------------------------------------------------------
+        # NEW: GEN-Z PREVIEW ENDPOINT
+        # ----------------------------------------------------------------------
+        @self.app.route("/genz-preview", methods=["GET"])
+        def genz_preview():
+            """Return example Gen-Z anonymization output."""
+            response_body = {
+                "example": "Call Emily at 577-988-1234",
+                "example_output": "Call GOAT at vibe check",
+                "description": "Example output of the genz anonymizer.",
+            }
+            return jsonify(response_body), 200
+
+        # ----------------------------------------------------------------------
+        # NEW: GEN-Z ANONYMIZER ENDPOINT
+        # ----------------------------------------------------------------------
+        @self.app.route("/genz", methods=["POST"])
+        def genz_anonymize():
+            """Apply Gen-Z anonymizer to PERSON and PHONE_NUMBER entities."""
+            content = request.get_json()
+            if not content:
+                raise BadRequest("Invalid request json")
+
+            text = content.get("text", "")
+            analyzer_results = content.get("analyzer_results", [])
+
+            items = []
+            for entity in analyzer_results:
+                entity_type = entity.get("entity_type")
+                start = entity.get("start")
+                end = entity.get("end")
+
+                if entity_type == "PERSON":
+                    replacement = "GOAT"
+                elif entity_type == "PHONE_NUMBER":
+                    replacement = "oop-"
+                else:
+                    continue
+
+                items.append(
+                    {
+                        "start": start,
+                        "end": end,
+                        "entity_type": entity_type,
+                        "text": replacement,
+                        "operator": "genz",
+                    }
+                )
+
+            response_body = {"text": text, "items": items}
+            return jsonify(response_body), 200
+
+        # ----------------------------------------------------------------------
+        # Error Handlers
+        # ----------------------------------------------------------------------
         @self.app.errorhandler(InvalidParamError)
         def invalid_param(err):
             self.logger.warning(
@@ -112,9 +179,11 @@ class Server:
             self.logger.error(f"A fatal error occurred during execution: {e}")
             return jsonify(error="Internal server error"), 500
 
-def create_app(): # noqa
+
+def create_app():  # noqa
     server = Server()
     return server.app
+
 
 if __name__ == "__main__":
     app = create_app()
