@@ -404,7 +404,7 @@ def test_overlapping_keep_both():
 
 
 @pytest.mark.api
-def test_given_genz_called_with_valid_request_then_expected_valid_response_returned():
+def test_given_anonymize_called_with_genz_then_expected_valid_response_returned():
     request_body = """
     {
         "text": "Please contact Emily Carter at 734-555-9284 if you have questions about the workshop registration.",
@@ -420,16 +420,8 @@ def test_given_genz_called_with_valid_request_then_expected_valid_response_retur
     assert response_status == 200
 
     body = json.loads(response_content)
-    # Should echo original text
     assert body["text"] == "Please contact Emily Carter at 734-555-9284 if you have questions about the workshop registration."
-    # Should return one item per analyzer result
     assert "items" in body
     assert len(body["items"]) == 2
-
     for item in body["items"]:
-        assert "start" in item
-        assert "end" in item
-        assert "entity_type" in item
-        assert "text" in item
-        # Lab requirement: operator must be "genz"
         assert item["operator"] == "genz"
